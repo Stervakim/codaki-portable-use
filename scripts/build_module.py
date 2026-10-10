@@ -29,8 +29,8 @@ def insert(zf: zipfile.ZipFile, name: str, raw: bytes, executable=False):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--display-jar", type=Path, required=True, help="Trusted display-engine.jar")
-    p.add_argument("--ui-jar", type=Path, required=True, help="Trusted ui-v2.jar")
+    p.add_argument("--display-jar", type=Path, default=ROOT / "core" / "display-engine.jar", help="Trusted display-engine.jar")
+    p.add_argument("--ui-jar", type=Path, default=ROOT / "core" / "ui-v2.jar", help="Trusted ui-v2.jar")
     p.add_argument("--output", type=Path, default=Path("codaki-portable-use-0.1.1.zip"))
     args = p.parse_args()
     dj = check_jar(args.display_jar, "display-engine.jar")
