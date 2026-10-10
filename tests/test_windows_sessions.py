@@ -69,6 +69,73 @@ class SessionsTests(unittest.TestCase):
         self.assertEqual(self.observe(b)['target'],'2')
         self.call('reconcile',{'request_id':'parallel_lost_01','outcome':'not_applied','evidence':'Verified test backend failed before applying'})
         self.call('session_extend',{'session_id':b})
+
+    def test_repeated_session_stop_returns_original_receipt(self):
+        """An acknowledgement retry must not stop the wrong next session."""
+        a=self.start('1'); b=self.start('2')
+        args={'session_id':a}
+        first=self.call('session_stop',args,'parallel_stop_receipt_1')
+        second=self.call('session_stop',args,'parallel_stop_receipt_1')
+        self.assertEqual(first,second)
+        self.assertTrue(first['stopped'])
+        self.assertEqual(self.observe(b)['target'],'2')
+        self.assertEqual(len(self.manager.sessions),1)
+
+    def test_two_threads_never_overlap_physical_input(self):
+        """Windows has one mouse/keyboard even with multiple window leases."""
+        import threading, time
+        a=self.start('1'); b=self.start('2')
+        oa=self.observe(a); ob=self.observe(b)
+        guard=threading.Lock()
+        active=[0]; peak=[0]; applied=[]; errors=[]
+        for sid in (a,b):
+            backend=self.manager.sessions[sid].backend
+            original=backend.action
+            def tracked(action,observation,original=original,sid=sid):
+                with guard:
+                    active[0]+=1
+                    peak[0]=max(peak[0],active[0])
+                try:
+                    time.sleep(0.03)
+                    applied.append(sid)
+                    return original(action,observation)
+                finally:
+                    with guard: active[0]-=1
+            backend.action=tracked
+        start=threading.Barrier(3)
+        def run(sid,observation,rid):
+            try:
+                start.wait(timeout=2)
+                self.manager.execute('action',
+                    {'session_id':sid,'observation_id':observation['observation_id'],
+                     'action':{'kind':'click','selector':{'text':'Button'}}},rid)
+            except Exception as error: errors.append(error)
+        workers=[
+            threading.Thread(target=run,args=(a,oa,'parallel_thread_a')),
+            threading.Thread(target=run,args=(b,ob,'parallel_thread_b')),
+        ]
+        for thread in workers:thread.start()
+        start.wait(timeout=2)
+        for thread in workers:thread.join(timeout=4)
+        self.assertFalse(any(thread.is_alive() for thread in workers))
+        self.assertEqual(errors,[])
+        self.assertEqual(len(applied),2)
+        self.assertEqual(peak[0],1)
+
+    def test_closed_window_can_be_released_without_disrupting_other_session(self):
+        """A stale or closed HWND must not trap an unrelated valid window."""
+        a=self.start('1'); b=self.start('2')
+        broken=self.manager.sessions[a].backend
+        def closed(screenshot=False):
+            raise UseError('Window closed or handle was reused','SESSION_EXPIRED')
+        broken.snapshot=closed
+        with self.assertRaises(UseError):
+            self.observe(a)
+        receipt=self.call('session_stop',{'session_id':a})
+        self.assertTrue(receipt['stopped'])
+        self.assertNotIn(a,self.manager.sessions)
+        self.assertEqual(self.observe(b)['target'],'2')
+
     def tearDown(self):
         if self.manager: self.manager.close()
         self.tmp.cleanup()
