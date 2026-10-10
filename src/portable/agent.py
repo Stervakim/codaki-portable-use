@@ -66,7 +66,7 @@ class Agent:
             try:
                 self.engine.expire()
                 if not self.flush():raise OSError('Pending result not acknowledged')
-                r=self.relay.request('/agent/next',{'capabilities':self.engine.backend.capabilities()})
+                r=self.relay.request('/agent/next',{'capabilities':self.engine._run('capabilities',{})})
                 if r.get('job'):self.process(r['job'])
                 else:stop_event.wait(0.05)  # Match proven Android Use relay responsiveness
                 failures=0

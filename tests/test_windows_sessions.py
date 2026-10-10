@@ -1,0 +1,74 @@
+import copy, tempfile, unittest
+from pathlib import Path
+from portable.engine import UseError
+from portable.windows_sessions import WindowsSessions
+
+class Backend:
+    def __init__(self): self.target=None; self.actions=[]
+    def capabilities(self): return {'platform':'windows','actions':['click']}
+    def apps(self): return [{'app_id':'test','windows':[{'window_id':'1'},{'window_id':'2'}]}]
+    def start(self,target=None,lease_seconds=300): self.target=str(target); return {'target':self.target}
+    def stop(self): self.target=None; return {'stopped':True,'windows_closed':False}
+    def extend(self,n): pass
+    def diagnostics(self): return {'target':self.target}
+    def snapshot(self,screenshot=False):
+        return {'target':self.target,'geometry':{'width':100,'height':100},'windows':[{'window_id':self.target}],
+                'nodes':[{'node_id':self.target+'/0','window_id':self.target,'text':'Button','role':'Button','enabled':True,'visible':True,'bounds':[0,0,20,20],'actions':['click']}]}
+    def action(self,action,observation): self.actions.append(copy.deepcopy(action)); return {'applied':True,'window_id':self.target}
+
+class SessionsTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory(); self.now=0; self.seq=0
+        self.manager=WindowsSessions(Backend,Path(self.tmp.name)/'journal.sqlite3',clock=lambda:self.now)
+    def tearDown(self): self.manager.close(); self.tmp.cleanup()
+    def call(self,op,args,rid=None):
+        self.seq+=1; return self.manager.execute(op,args,rid or 'parallel_%08d'%self.seq)
+    def start(self,target,lease=300): return self.call('session_start',{'target':target,'lease_seconds':lease})['session_id']
+    def observe(self,sid): return self.call('observe',{'session_id':sid})
+    def test_two_windows_keep_independent_observations_and_stop(self):
+        a=self.start('1'); b=self.start('2'); oa=self.observe(a); ob=self.observe(b)
+        result=self.call('action',{'session_id':a,'observation_id':oa['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}},'parallel_action_1')
+        self.assertEqual(result['observation']['session_id'],a)
+        with self.assertRaises(UseError): self.call('action',{'session_id':b,'observation_id':oa['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}})
+        self.call('session_stop',{'session_id':a}); self.assertEqual(self.observe(b)['target'],'2')
+        self.assertEqual(len(self.call('diagnostics',{})['sessions']),1)
+    def test_duplicate_window_rejected_and_lease_expires_independently(self):
+        a=self.start('1',30); b=self.start('2',90)
+        with self.assertRaises(UseError): self.start('1')
+        self.now=31; self.manager.expire()
+        with self.assertRaises(UseError): self.observe(a)
+        self.assertEqual(self.observe(b)['target'],'2'); self.start('1')
+    def test_request_ids_are_global_and_inputs_never_replay(self):
+        a=self.start('1'); b=self.start('2'); obs=self.observe(a)
+        args={'session_id':a,'observation_id':obs['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}}
+        receipt=self.call('action',args,'parallel_replay_1'); self.assertEqual(self.call('action',args,'parallel_replay_1'),receipt)
+        self.assertEqual(len(self.manager.sessions[a].backend.actions),1)
+        with self.assertRaises(UseError): self.call('action',{**args,'session_id':b},'parallel_replay_1')
+        self.assertEqual(self.call('result',{'request_id':'parallel_replay_1'})['status'],'completed')
+    def test_close_releases_all_windows_without_closing_apps(self):
+        a=self.start('1'); b=self.start('2'); backends=[self.manager.sessions[s].backend for s in (a,b)]
+        self.manager.close(); self.assertTrue(all(x.target is None for x in backends)); self.manager=None
+    def test_action_in_one_session_keeps_other_observation_usable(self):
+        a=self.start('1'); b=self.start('2'); oa=self.observe(a); ob=self.observe(b)
+        for sid,obs in ((a,oa),(b,ob)):
+            result=self.call('action',{'session_id':sid,'observation_id':obs['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}})
+            self.assertEqual(result['window_id'],'1' if sid==a else '2')
+    def test_capacity_is_reclaimed_on_stop(self):
+        self.manager.max_sessions=2; a=self.start('1'); self.start('2')
+        with self.assertRaises(UseError): self.start('3')
+        self.call('session_stop',{'session_id':a}); self.start('3')
+    def test_uncertain_input_blocks_every_session_until_checked_reconciliation(self):
+        a=self.start('1'); b=self.start('2'); oa=self.observe(a)
+        def lost(action,observation): raise RuntimeError('lost receipt')
+        self.manager.sessions[a].backend.action=lost
+        with self.assertRaises(UseError) as error:
+            self.call('action',{'session_id':a,'observation_id':oa['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}},'parallel_lost_01')
+        self.assertEqual(error.exception.code,'UNCERTAIN')
+        with self.assertRaises(UseError) as error: self.call('session_extend',{'session_id':b})
+        self.assertEqual(error.exception.code,'BLOCKED')
+        self.assertEqual(self.observe(b)['target'],'2')
+        self.call('reconcile',{'request_id':'parallel_lost_01','outcome':'not_applied','evidence':'Verified test backend failed before applying'})
+        self.call('session_extend',{'session_id':b})
+    def tearDown(self):
+        if self.manager: self.manager.close()
+        self.tmp.cleanup()

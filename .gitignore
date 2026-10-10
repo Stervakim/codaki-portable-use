@@ -16,3 +16,10 @@ backup/
 backup-*/
 *.zip
 .DS_Store
+
+.venv/
+node_modules/
+agent-windows.json
+windows-agent-state/
+cloud/.openai/hosting.json
+!dist/codaki-portable-use-0.1.2*.zip

@@ -1,0 +1,36 @@
+name: Publish versioned package
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify regression tests
+        env:
+          PYTHONPATH: src
+        run: |
+          python -m unittest discover -s tests -p 'test_*.py'
+          node --test cloud/tests/sites.test.mjs
+      - name: Verify committed archives and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(cat VERSION)"
+          (cd dist && sha256sum -c SHA256SUMS)
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; leaving it unchanged."
+          else
+            gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Codaki Portable Use $VERSION" --notes-file docs/RELEASE_NOTES.md "dist/codaki-portable-use-$VERSION-full.zip" "dist/codaki-portable-use-$VERSION-android.zip" dist/SHA256SUMS CODEX_INSTALL.md
+          fi

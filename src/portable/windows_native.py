@@ -3,6 +3,7 @@ import base64, io, os, re, subprocess
 from collections import deque
 from .engine import UseError
 from .journal import digest
+from . import __version__
 
 def key_sequence(key):
     parts=key.split('+');modifiers={'Control_L':'^','Ctrl':'^','Control':'^','Shift_L':'+','Shift':'+','Alt_L':'%','Alt':'%'}
@@ -56,7 +57,7 @@ class NativeDriver:
 
 class WindowsBackend:
     def __init__(self,driver=None):self.driver=driver or NativeDriver();self.binding=None;self.handles={}
-    def capabilities(self):return {'platform':'windows','version':'0.1.0','backend':'pywinauto-uia','standalone':True,'actions':['click','focus','set_text','select','key','drag','scroll'],'unicode':True,'multitouch':False,'apps_scope':'running windows','screenshot_requires_foreground':True,'secure_desktop':False}
+    def capabilities(self):return {'platform':'windows','version':__version__,'backend':'pywinauto-uia','standalone':True,'actions':['click','focus','set_text','select','key','drag','scroll'],'unicode':True,'multitouch':False,'apps_scope':'running windows','screenshot_requires_foreground':True,'secure_desktop':False}
     def apps(self):
         apps={}
         for w in self.driver.windows():

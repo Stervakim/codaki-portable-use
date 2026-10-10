@@ -213,8 +213,12 @@ class Engine:
             requested=args.get('action')
             # A UI screenshot can be very expensive, and image bytes are not
             # needed to verify a semantic target. Read the native tree only.
-            current=sanitize(self.backend.snapshot(screenshot=False))
-            unchanged=(not obs.get('screenshot') and fingerprint(current)==obs['fingerprint'])
+            # Windows coordinate actions require a current screenshot and a
+            # verified fingerprint; Android semantic reads stay tree-only.
+            visual=bool(obs.get('screenshot')) and self.backend.capabilities().get('platform')=='windows'
+            current=sanitize(self.backend.snapshot(screenshot=visual))
+            current['fingerprint']=fingerprint(current)
+            unchanged=(current['fingerprint']==obs['fingerprint'])
             if not unchanged and not stable_action_target(obs,current,requested if isinstance(requested,dict) else {}):
                 raise UseError('Input target or foreground changed; observe again','STALE')
             # Bind the action to the verified *current* node tree and to the

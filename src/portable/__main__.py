@@ -8,7 +8,7 @@ def main():
     if a.platform=='android':from .android import AndroidBackend as Backend
     elif a.windows_backend=='sky':from .sky import SkyBackend as Backend
     else:from .windows_native import WindowsBackend as Backend
-    backend=Backend();a.state.mkdir(parents=True,exist_ok=True)
+    a.state.mkdir(parents=True,exist_ok=True)
     lock=None
     if os.name!='nt':
         import fcntl
@@ -16,10 +16,14 @@ def main():
     else:
         import msvcrt
         lock=(a.state/'agent.lock').open('a+b');lock.seek(0);lock.write(b'1');lock.flush();lock.seek(0);msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
-    engine=Engine(backend,a.state/'journal.sqlite3');stop=threading.Event()
+    if a.platform=='windows':
+        from .windows_sessions import WindowsSessions
+        engine=WindowsSessions(Backend,a.state/'journal.sqlite3')
+    else:engine=Engine(Backend(),a.state/'journal.sqlite3')
+    backend=engine.backend;stop=threading.Event()
     for sig in (signal.SIGINT,signal.SIGTERM):signal.signal(sig,lambda *_:stop.set())
     try:
-        if a.mode=='check':print(json.dumps(backend.capabilities(),ensure_ascii=False));return
+        if a.mode=='check':print(json.dumps(engine._run('capabilities',{}),ensure_ascii=False));return
         if a.mode=='local':
             if a.platform!='android':p.error('local socket mode requires Android')
             from .local import serve
@@ -45,11 +49,11 @@ def main():
                 if stop.is_set():break
     finally:
         stop.set()
-        if engine.session:
+        if a.platform!='windows' and engine.session:
             try:backend.stop()
             except Exception:pass
         engine.close()
-        if hasattr(backend,'close'):backend.close()
+        if a.platform!='windows' and hasattr(backend,'close'):backend.close()
         if lock:lock.close()
 
 if __name__=='__main__':main()
