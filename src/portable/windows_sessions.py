@@ -66,7 +66,17 @@ class WindowsSessions(Engine):
         sid=args.get('session_id')
         child=self.sessions.get(sid)
         if child is None: raise UseError('Missing, expired or different session','SESSION_EXPIRED')
-        result=child._run(op,args)
+        try:
+            result=child._run(op,args)
+        finally:
+            if op in ('action','launch'):
+                # Physical input or application launch may change the desktop
+                # foreground. Keep independent leases, but require a fresh
+                # observation before the next action in every other window.
+                # Invalidate even when a native outcome is unknown or fails.
+                for other_sid,other in self.sessions.items():
+                    if other_sid != sid:
+                        other.observation=None
         self.session=child.session
         if op=='session_stop': self._release(sid)
         return result
