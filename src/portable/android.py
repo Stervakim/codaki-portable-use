@@ -1,6 +1,7 @@
 import json, os, re, subprocess, tempfile, time, socket, struct, signal
 from pathlib import Path
 from .engine import UseError, BackendOutcomeUnknown
+from . import __version__
 
 ROOT=Path(__file__).resolve().parents[1]
 def parse_apps(raw):
@@ -21,7 +22,7 @@ class AndroidBackend:
         self._persistent=True
         if os.geteuid()!=0:raise UseError('Android backend requires preinstalled authorized root')
     def capabilities(self):
-        return {'platform':'android','version':'0.1.1','display_isolation':True,'physical_display':False,
+        return {'platform':'android','version':__version__,'display_isolation':True,'physical_display':False,
                 'actions':['click','long_click','focus','set_text','selection','select','scroll','key','gesture','drag'],
                 'max_text':65536,'max_fingers':5,'unicode':True,'persistent_inspector':True}
     def verified_display(self):
