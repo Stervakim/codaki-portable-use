@@ -1,12 +1,12 @@
-# Codaki Portable Use 0.1.2
+# Codaki Portable Use 0.1.2b
 
 Управление Android на отдельном виртуальном экране и Windows-приложениями через локальный или закрытый облачный MCP.
 
-**Hotfix 0.1.2:** [исправления Windows/Android и статус архивов](docs/HOTFIX_0.1.2.md). Исходники `main` обновлены; ранее опубликованные ZIP релиза пока не содержат этот hotfix.
+**0.1.2b:** проверенная сборка с защитой от устаревших наблюдений Windows и корректным номером версии Android. Оригинальные ZIP 0.1.2 остаются архивом предыдущей сборки.
 
-**[Установить через Codex](CODEX_INSTALL.md)** · [Изменения](CHANGELOG.md) · [Полный ZIP 0.1.2](dist/codaki-portable-use-0.1.2-full.zip) · [Android Magisk ZIP](dist/codaki-portable-use-0.1.2-android.zip) · [SHA-256](dist/SHA256SUMS)
+**[Установить через Codex](CODEX_INSTALL.md)** · [Изменения](CHANGELOG.md) · [Релиз 0.1.2b и проверенные ZIP](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/tag/v0.1.2b)
 
-## Новое в 0.1.2
+## Новое в 0.1.2b
 
 - Отдельная регистрация Windows в Sites с собственным ключом; Android-ключ сохраняется.
 - До восьми одновременно открытых Windows-сеансов для разных окон с независимыми наблюдениями и сроками действия.
