@@ -1,10 +1,10 @@
-# Установка через Codex — Codaki Portable Use 0.1.2
+# Установка через Codex — Codaki Portable Use 0.1.2b
 
 Передайте этот файл Codex и поручите установить или обновить Portable Use на вашем Windows-ПК, Android или обоих устройствах. Репозиторий: https://github.com/kalabuxova1-hash/codaki-portable-use
 
 ## Проверить пакет
 
-Скачайте `dist/codaki-portable-use-0.1.2-full.zip` и `dist/SHA256SUMS`. Сверьте SHA-256 ZIP до распаковки. Архив содержит исходники, Windows-установщик, облачный сервер, тесты, документацию и Android Magisk ZIP. Дополнительно проверьте `MANIFEST.sha256.json` внутри полного архива. Ключей и конфигураций реальных устройств в пакете нет.
+Скачайте `dist/codaki-portable-use-0.1.2b-full.zip` и `dist/SHA256SUMS`. Сверьте SHA-256 ZIP до распаковки. Архив содержит исходники, Windows-установщик, облачный сервер, тесты, документацию и Android Magisk ZIP. Дополнительно проверьте `MANIFEST.sha256.json` внутри полного архива. Ключей и конфигураций реальных устройств в пакете нет.
 
 ## Windows: новая установка
 
@@ -46,7 +46,7 @@
 
 ## Android
 
-Инструкция: [docs/ANDROID_INSTALL.md](docs/ANDROID_INSTALL.md). ZIP `dist/codaki-portable-use-0.1.2-android.zip` содержит оба проверенных JAR. Root/Magisk/Termux должны быть установлены заранее. Существующую телефонную установку не меняйте в рамках Windows-установки. Перед Android-обновлением сохраните данные и конфиг, проверьте совместимость, не перезагружайте без согласия владельца.
+Инструкция: [docs/ANDROID_INSTALL.md](docs/ANDROID_INSTALL.md). ZIP `dist/codaki-portable-use-0.1.2b-android.zip` содержит оба проверенных JAR. Root/Magisk/Termux должны быть установлены заранее. Существующую телефонную установку не меняйте в рамках Windows-установки. Перед Android-обновлением сохраните данные и конфиг, проверьте совместимость, не перезагружайте без согласия владельца.
 
 ## Проверки исходников
 
