@@ -14,6 +14,7 @@ class Backend:
     def snapshot(self,screenshot=False):
         return {'target':self.target,'geometry':{'width':100,'height':100},'windows':[{'window_id':self.target}],
                 'nodes':[{'node_id':self.target+'/0','window_id':self.target,'text':'Button','role':'Button','enabled':True,'visible':True,'bounds':[0,0,20,20],'actions':['click']}]}
+    def launch(self,app): return {'requested':app,'verify_with_observe':True}
     def action(self,action,observation): self.actions.append(copy.deepcopy(action)); return {'applied':True,'window_id':self.target}
 
 class SessionsTests(unittest.TestCase):
@@ -48,11 +49,17 @@ class SessionsTests(unittest.TestCase):
     def test_close_releases_all_windows_without_closing_apps(self):
         a=self.start('1'); b=self.start('2'); backends=[self.manager.sessions[s].backend for s in (a,b)]
         self.manager.close(); self.assertTrue(all(x.target is None for x in backends)); self.manager=None
-    def test_action_in_one_session_keeps_other_observation_usable(self):
+    def test_action_in_one_session_preserves_other_lease_but_expires_observation(self):
         a=self.start('1'); b=self.start('2'); oa=self.observe(a); ob=self.observe(b)
-        for sid,obs in ((a,oa),(b,ob)):
-            result=self.call('action',{'session_id':sid,'observation_id':obs['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}})
-            self.assertEqual(result['window_id'],'1' if sid==a else '2')
+        first=self.call('action',{'session_id':a,'observation_id':oa['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}})
+        self.assertEqual(first['window_id'],'1')
+        self.assertIn(b,self.manager.sessions)
+        with self.assertRaises(UseError) as exc:
+            self.call('action',{'session_id':b,'observation_id':ob['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}})
+        self.assertEqual(exc.exception.code,'STALE')
+        fresh=self.observe(b)
+        result=self.call('action',{'session_id':b,'observation_id':fresh['observation_id'],'action':{'kind':'click','selector':{'text':'Button'}}})
+        self.assertEqual(result['window_id'],'2')
     def test_capacity_is_reclaimed_on_stop(self):
         self.manager.max_sessions=2; a=self.start('1'); self.start('2')
         with self.assertRaises(UseError): self.start('3')
@@ -118,7 +125,16 @@ class SessionsTests(unittest.TestCase):
         start.wait(timeout=2)
         for thread in workers:thread.join(timeout=4)
         self.assertFalse(any(thread.is_alive() for thread in workers))
-        self.assertEqual(errors,[])
+        # One request wins the shared input lock. The other must refresh
+        # its observation before retrying; no stale input reaches the desktop.
+        self.assertEqual(len(applied),1)
+        self.assertEqual(len(errors),1)
+        self.assertIsInstance(errors[0],UseError)
+        self.assertEqual(errors[0].code,'STALE')
+        sid=next(s for s in (a,b) if s not in applied)
+        refreshed=self.observe(sid)
+        self.call('action',{'session_id':sid,'observation_id':refreshed['observation_id'],
+             'action':{'kind':'click','selector':{'text':'Button'}}})
         self.assertEqual(len(applied),2)
         self.assertEqual(peak[0],1)
 
@@ -134,6 +150,16 @@ class SessionsTests(unittest.TestCase):
         receipt=self.call('session_stop',{'session_id':a})
         self.assertTrue(receipt['stopped'])
         self.assertNotIn(a,self.manager.sessions)
+        self.assertEqual(self.observe(b)['target'],'2')
+
+    def test_launch_expires_other_window_observation(self):
+        a=self.start('1'); b=self.start('2')
+        stale=self.observe(b)
+        self.call('launch',{'session_id':a,'app_id':'test'})
+        with self.assertRaises(UseError) as exc:
+            self.call('action',{'session_id':b,'observation_id':stale['observation_id'],
+                'action':{'kind':'click','selector':{'text':'Button'}}})
+        self.assertEqual(exc.exception.code,'STALE')
         self.assertEqual(self.observe(b)['target'],'2')
 
     def tearDown(self):
