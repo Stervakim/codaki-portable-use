@@ -1,10 +1,10 @@
-# Codaki Portable Use — 0.1.2b (подготовка)
+# Codaki Portable Use 0.1.2b
 
 Управление Android на отдельном виртуальном экране и Windows-приложениями через локальный или закрытый облачный MCP.
 
-**Внимание: релиз 0.1.2b ещё не опубликован.** Изменения исходников подготовлены, но версия в `VERSION` остаётся `0.1.2`, и новых ZIP пока нет. **0.1.2b:** проверенная сборка с защитой от устаревших наблюдений Windows и корректным номером версии Android. Оригинальные ZIP 0.1.2 остаются архивом предыдущей сборки.
+**Выпущена 0.1.2b:** исправлены устаревшие наблюдения Windows и отображение версии Android. Доступны новые ZIP для установки и SHA-256; оригинальные 0.1.2 оставлены без изменений.
 
-**[Установить через Codex](CODEX_INSTALL.md)** · [Изменения](CHANGELOG.md) · [Последний доступный релиз 0.1.2](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/tag/v0.1.2)
+**[Установить через Codex](CODEX_INSTALL.md)** · [Изменения](CHANGELOG.md) · [Релиз 0.1.2b](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/tag/v0.1.2b) · [Полный ZIP](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/download/v0.1.2b/codaki-portable-use-0.1.2b-full.zip) · [Android ZIP](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/download/v0.1.2b/codaki-portable-use-0.1.2b-android.zip)
 
 ## Новое в 0.1.2b
 
