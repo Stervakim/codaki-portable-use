@@ -1,4 +1,4 @@
-# INSTALL WITH CODEX — Codaki Portable Use 0.1.2
+# INSTALL WITH CODEX — Codaki Portable Use 0.1.2b
 
 ## Что делать Codex
 
@@ -8,7 +8,7 @@
 
 ### 1. Проверка
 
-1. Скачай репозиторий из GitHub. Проверь структуру файлов и сравни версию `magisk/module.prop` (ожидается 0.1.2).
+1. Скачай репозиторий из GitHub. Проверь структуру файлов и сравни версию `magisk/module.prop` (ожидается 0.1.2b).
 2. Проверь доступность `adb devices` и явно разрешенного устройства владельца.
 3. Проверь root через `adb shell su -c id`, наличие Magisk и уже установленного Termux Python 3.10+ с `ssl` и `sqlite3`.
 4. **Никогда** не устанавливай Magisk или root самостоятельно. Не меняй VPN, сеть, VLESS, Android Use, Mini Codex, launcher, политики безопасности или физический экран.
@@ -16,7 +16,7 @@
 
 ### 2. Скачать проверенный установочный архив
 
-Готовый ZIP включён в репозиторий: `dist/codaki-portable-use-0.1.2-android.zip`. Он содержит исходный Python-runtime, Magisk-модуль и два JAR (`core/display-engine.jar`, `core/ui-v2.jar`) из установленного экземпляра владельца.
+Готовый ZIP включён в репозиторий: `dist/codaki-portable-use-0.1.2b-android.zip`. Он содержит исходный Python-runtime, Magisk-модуль и два JAR (`core/display-engine.jar`, `core/ui-v2.jar`) из установленного экземпляра владельца.
 
 Скачай файл и **обязательно сравни SHA-256**:
 
@@ -29,7 +29,7 @@
 Если нужна самостоятельная пересборка, в корне репозитория есть исходники и два JAR. Запусти:
 
 ```sh
-python3 scripts/build_module.py --output codaki-portable-use-0.1.2-android.zip
+python3 scripts/build_module.py --output codaki-portable-use-0.1.2b-android.zip
 ```
 
 Если хочешь предоставить другие проверенные JAR, используй флаги `--display-jar /ABS/PATH/display-engine.jar --ui-jar /ABS/PATH/ui-v2.jar`. Установка в пункте 4 рассчитана на готовый ZIP.
@@ -39,8 +39,8 @@ python3 scripts/build_module.py --output codaki-portable-use-0.1.2-android.zip
 ### 4. Установка **на новое устройство** (после проверок)
 
 ```sh
-adb push codaki-portable-use-0.1.2-android.zip /data/local/tmp/codaki-portable-use-0.1.2-android.zip
-adb shell su -c 'magisk --install-module /data/local/tmp/codaki-portable-use-0.1.2-android.zip'
+adb push codaki-portable-use-0.1.2b-android.zip /data/local/tmp/codaki-portable-use-0.1.2b-android.zip
+adb shell su -c 'magisk --install-module /data/local/tmp/codaki-portable-use-0.1.2b-android.zip'
 ```
 
 Синтаксис установки Magisk уточни на устройстве. Если приложение Magisk требует установку через интерфейс, не подменяй его неофициальными командами.
