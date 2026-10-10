@@ -2,6 +2,8 @@
 
 Управление Android на отдельном виртуальном экране и Windows-приложениями через локальный или закрытый облачный MCP.
 
+**Hotfix 0.1.2:** [исправления Windows/Android и статус архивов](docs/HOTFIX_0.1.2.md). Исходники `main` обновлены; ранее опубликованные ZIP релиза пока не содержат этот hotfix.
+
 **[Установить через Codex](CODEX_INSTALL.md)** · [Изменения](CHANGELOG.md) · [Полный ZIP 0.1.2](dist/codaki-portable-use-0.1.2-full.zip) · [Android Magisk ZIP](dist/codaki-portable-use-0.1.2-android.zip) · [SHA-256](dist/SHA256SUMS)
 
 ## Новое в 0.1.2
