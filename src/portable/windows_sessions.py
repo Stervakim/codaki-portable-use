@@ -28,10 +28,29 @@ class WindowsSessions(Engine):
         child=self.sessions.pop(sid)
         if hasattr(child.backend,'close'): child.backend.close()
 
+    def _current_observation(self,session_id):
+        self.expire()
+        child=self.sessions.get(session_id)
+        if child is None:raise UseError('Missing, expired or different session','SESSION_EXPIRED')
+        child.require_session({'session_id':session_id})
+        return child.observation
+
+    def _run_batch(self,args,parent_id):
+        self._current_observation(args.get('session_id'))
+        supported=set(self.sessions[args['session_id']].backend.capabilities().get('actions',[]))
+        validator=getattr(self.sessions[args['session_id']].backend,'validate_batch_action',None)
+        for step in args.get('steps',[]) if isinstance(args.get('steps'),list) else []:
+            action=step.get('action') if isinstance(step,dict) else None
+            if isinstance(action,dict) and action.get('kind') not in supported:
+                raise UseError('Batch action is unsupported by this Windows backend','UNSUPPORTED')
+            if validator and isinstance(action,dict):validator(action)
+        return super()._run_batch(args,parent_id)
+
     def _run(self,op,args):
         self.expire()
         if op=='capabilities':
             return {**self.backend.capabilities(),'parallel_sessions':True,
+                    'batch':True,'max_batch_steps':12,'max_batch_timeout_ms':30000,
                     'max_sessions':self.max_sessions,'session_scope':'window',
                     'input_serialized':True,'desktop_isolation':False}
         if op=='diagnostics':

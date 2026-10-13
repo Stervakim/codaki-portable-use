@@ -4,7 +4,7 @@
 
 **Выпущена 0.1.2b:** исправлены устаревшие наблюдения Windows и отображение версии Android. Доступны новые ZIP для установки и SHA-256; оригинальные 0.1.2 оставлены без изменений.
 
-**[Установить через Codex](CODEX_INSTALL.md)** · [Изменения](CHANGELOG.md) · [Релиз 0.1.2b](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/tag/v0.1.2b) · [Полный ZIP](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/download/v0.1.2b/codaki-portable-use-0.1.2b-full.zip) · [Android ZIP](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/download/v0.1.2b/codaki-portable-use-0.1.2b-android.zip)
+**[Установить через Codex](CODEX_INSTALL.md)** · [Изменения](CHANGELOG.md) · [Релиз 0.1.2b](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/tag/v0.1.2b) · [Полный ZIP](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/download/v0.1.2b/codaki-portable-use-0.1.3-full.zip) · [Android ZIP](https://github.com/kalabuxova1-hash/codaki-portable-use/releases/download/v0.1.2b/codaki-portable-use-0.1.3-android.zip)
 
 ## Новое в 0.1.2b
 

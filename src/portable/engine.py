@@ -15,6 +15,7 @@ FIELDS={
  'session_start':{'lease_seconds','target'},'session_extend':{'session_id','lease_seconds'},
  'session_stop':{'session_id'},'observe':{'session_id','screenshot'},
  'launch':{'session_id','app_id'},'action':{'session_id','observation_id','action'},
+ 'batch':{'session_id','observation_id','steps','timeout_ms'},
  'result':{'request_id'},'reconcile':{'request_id','outcome','evidence'}}
 SELECTOR_FIELDS={'node_id','resource_id','text','description','role','parent_id','window_id','occurrence'}
 
@@ -148,7 +149,7 @@ class Engine:
             try:self.journal.begin(request_id,op,args)
             except RuntimeError as e:raise UseError(str(e),'JOURNAL_FULL') from e
             try:
-                result=self._run(op,copy.deepcopy(args))
+                result=self._run_batch(copy.deepcopy(args),request_id) if op=='batch' else self._run(op,copy.deepcopy(args))
             except UseError as e:
                 self.journal.finish(request_id,'failed',{'error':str(e),'code':e.code});raise
             except Exception as e:
@@ -170,8 +171,104 @@ class Engine:
                 else:result['instruction']='Use the returned observation for verification and the next action; refresh if the interface is still changing.'
                 self.journal.finish(request_id,'completed',result)
             return result
+    def _current_observation(self,session_id):
+        self.require_session({'session_id':session_id})
+        return self.observation
+    def _run_batch(self,args,parent_id):
+        from .mcp import TOOLS, validate
+        schema=next(t['inputSchema'] for t in TOOLS if t['name']=='use_batch')
+        validate(schema,{**args,'device_id':'local','request_id':parent_id})
+        # Validate the entire recipe before its first input. Selectors describe
+        # semantics across screens; positional IDs/coordinates cannot be reused.
+        steps=args.get('steps');timeout=args.get('timeout_ms',15000)
+        if not isinstance(steps,list) or not 1<=len(steps)<=12:raise UseError('Batch needs 1..12 steps')
+        if type(timeout)!=int or not 1<=timeout<=30000:raise UseError('timeout_ms must be 1..30000')
+        stable={'resource_id','text','description','role','occurrence'}
+        allowed={'click','long_click','focus','set_text','selection','select','scroll','key'}
+        for step in steps:
+            if not isinstance(step,dict) or set(step)-{'action','wait_for','wait_timeout_ms'}:raise UseError('Invalid batch step')
+            action=step.get('action')
+            if not isinstance(action,dict) or action.get('kind') not in allowed:raise UseError('Unsupported batch action')
+            if set(action)&{'x','y','paths','from_x','from_y','to_x','to_y'}:raise UseError('Batch requires semantic targets')
+            kind=action['kind']
+            if kind in ('click','long_click') and not 1<=action.get('click_count',1)<=3:raise UseError('click_count must be 1..3')
+            if kind=='set_text':
+                if not isinstance(action.get('text'),str):raise UseError('set_text requires text')
+                mode=action.get('mode','replace')
+                if mode not in ('replace','append','insert'):raise UseError('Unknown text mode')
+                if mode=='insert':
+                    start=action.get('start');end=action.get('end',start)
+                    if type(start)!=int or type(end)!=int or not 0<=start<=end:raise UseError('Invalid replacement range')
+            if kind=='selection':
+                start=action.get('start');end=action.get('end')
+                if type(start)!=int or type(end)!=int or not 0<=start<=end:raise UseError('Invalid selection range')
+            if kind=='key' and not isinstance(action.get('key'),str):raise UseError('key requires key name')
+            if kind=='key' and not 1<=len(action['key'])<=100:raise UseError('Invalid key')
+            if kind=='scroll' and 'direction' in action and not action['direction']:raise UseError('Invalid scroll direction')
+            selectors=[action.get('selector')]
+            if action['kind']=='key' and 'selector' not in action:selectors=[]
+            if 'wait_for' in step:selectors.append(step['wait_for'])
+            for selector in selectors:
+                if not isinstance(selector,dict) or not selector or set(selector)-stable or not set(selector)-{'occurrence'}:raise UseError('Batch requires stable selectors')
+            delay=step.get('wait_timeout_ms',2000)
+            if type(delay)!=int or not 0<=delay<=5000:raise UseError('wait_timeout_ms must be 0..5000')
+        sid=args.get('session_id');obs=self._current_observation(sid)
+        if not obs or args.get('observation_id')!=obs['observation_id'] or self.clock()>=obs['expires_at']:raise UseError('Observation expired or already consumed','STALE')
+        deadline=self.clock()+timeout/1000
+        result={'status':'running','completed':0,'total':len(steps),'steps':[]}
+        def checkpoint():self.journal.finish(parent_id,'started',result)
+        def stop(index,code,error):
+            result.update(status='stopped',stopped_at=index,code=code,error=error)
+            result.pop('inflight_request_id',None)
+            if obs is not None:result['observation']=copy.deepcopy(obs)
+            return result
+        checkpoint()
+        for index,step in enumerate(steps):
+            if self.clock()>=deadline:return stop(index,'TIMEOUT','Batch deadline reached; later steps were not started')
+            if 'wait_for' in step:
+                until=min(deadline,self.clock()+step.get('wait_timeout_ms',2000)/1000)
+                while True:
+                    try:
+                        obs=self._run('observe',{'session_id':sid,'screenshot':False})
+                        # An ambiguous match is a stop, not permission to pick.
+                        selector=step['wait_for']
+                        matches=[n for n in obs.get('nodes',[]) if all(n.get(k)==v for k,v in selector.items() if k!='occurrence')]
+                        if matches:
+                            select(obs.get('nodes',[]),selector)
+                            break
+                    except UseError as error:return stop(index,error.code,str(error))
+                    except Exception:return stop(index,'BACKEND_FAILED','Could not observe the awaited target')
+                    remaining=until-self.clock()
+                    if remaining<=0:return stop(index,'TIMEOUT','Awaited target did not appear uniquely')
+                    time.sleep(min(.1,remaining))
+            if self.clock()>=deadline:return stop(index,'TIMEOUT','Batch deadline reached; later steps were not started')
+            child_id='batch_'+digest(parent_id)[:48]+'_%02d'%index
+            result['inflight_request_id']=child_id
+            checkpoint()  # Crash recovery retains identity before any input.
+            entry={'index':index,'request_id':child_id,'applied':False,'status':'not_started'}
+            try:
+                receipt=self.execute('action',{'session_id':sid,'observation_id':obs['observation_id'],'action':step['action']},child_id)
+            except UseError as error:
+                saved=self.journal.get(child_id)
+                entry['status']=saved[1] if saved else 'not_started'
+                entry.update(code=error.code,error=str(error))
+                result['steps'].append(entry)
+                try:obs=self._current_observation(sid)
+                except UseError:obs=None
+                return stop(index,error.code,str(error))
+            entry.update(applied=receipt.get('applied') is True,status='completed')
+            result['steps'].append(entry)
+            if entry['applied']:result['completed']+=1
+            result.pop('inflight_request_id',None)
+            checkpoint()
+            obs=receipt.get('observation')
+            if not entry['applied']:return stop(index,'RECEIPT_NOT_CONFIRMED','Step did not confirm applied input')
+            if obs is None:return stop(index,'OBSERVATION_FAILED','Input was applied; observe again before further input')
+        result['status']='completed'
+        result['observation']=copy.deepcopy(obs)
+        return result
     def _run(self,op,args):
-        if op=='capabilities':return self.backend.capabilities()
+        if op=='capabilities':return {**self.backend.capabilities(),'batch':True,'max_batch_steps':12,'max_batch_timeout_ms':30000}
         if op=='apps':return {'apps':self.backend.apps()}
         if op=='diagnostics':return {'blocked':bool(self.journal.uncertain()),'uncertain_requests':self.journal.uncertain(),'session':self.session,'backend':self.backend.diagnostics()}
         if op=='result':
@@ -215,7 +312,8 @@ class Engine:
             # needed to verify a semantic target. Read the native tree only.
             # Windows coordinate actions require a current screenshot and a
             # verified fingerprint; Android semantic reads stay tree-only.
-            visual=bool(obs.get('screenshot')) and self.backend.capabilities().get('platform')=='windows'
+            coordinate_input=isinstance(requested,dict) and not requested.get('selector') and requested.get('kind') in ('click','long_click','focus','scroll','drag','gesture')
+            visual=bool(obs.get('screenshot')) and coordinate_input and self.backend.capabilities().get('platform')=='windows'
             current=sanitize(self.backend.snapshot(screenshot=visual))
             current['fingerprint']=fingerprint(current)
             unchanged=(current['fingerprint']==obs['fingerprint'])

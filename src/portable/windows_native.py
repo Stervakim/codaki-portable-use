@@ -58,6 +58,14 @@ class NativeDriver:
 class WindowsBackend:
     def __init__(self,driver=None):self.driver=driver or NativeDriver();self.binding=None;self.handles={}
     def capabilities(self):return {'platform':'windows','version':__version__,'backend':'pywinauto-uia','standalone':True,'actions':['click','focus','set_text','select','key','drag','scroll'],'unicode':True,'multitouch':False,'apps_scope':'running windows','screenshot_requires_foreground':True,'secure_desktop':False}
+    def validate_batch_action(self,action):
+        # Static native constraints are known before any preceding batch input.
+        kind=action.get('kind')
+        if kind=='key':
+            if not isinstance(action.get('key'),str):raise UseError('key requires a native key name')
+            key_sequence(action['key'])
+        if kind=='scroll':raise UseError('Native batch does not support semantic scroll; coordinate scroll needs an observed screenshot','UNSUPPORTED')
+        if kind=='click' and action.get('button','left')!='left':raise UseError('Native semantic batch click supports only Invoke/left button','UNSUPPORTED')
     def apps(self):
         apps={}
         for w in self.driver.windows():
@@ -110,7 +118,7 @@ class WindowsBackend:
             r=c.rectangle()
             try:focused=bool(info.element.CurrentHasKeyboardFocus)
             except Exception:focused=False
-            nodes.append({'node_id':nid,'parent_id':parent,'window_id':wid,'resource_id':info.automation_id or '', 'role':info.control_type,'text':text,'text_value_known':known,'description':'' if protected else info.name or '', 'password':protected,'focused':focused,'enabled':c.is_enabled(),'visible':c.is_visible(),'actions':actions,'bounds':[r.left-rect.left,r.top-rect.top,r.right-rect.left,r.bottom-rect.top]})
+            nodes.append({'node_id':nid,'parent_id':parent,'window_id':wid,'resource_id':info.automation_id or '', 'role':info.control_type,'text':text,'text_value_known':known,'description':'' if protected else info.name or '', 'password':protected,'focused':focused,'editable':'set_text' in actions,'scrollable':False,'enabled':c.is_enabled(),'visible':c.is_visible(),'actions':actions,'bounds':[r.left-rect.left,r.top-rect.top,r.right-rect.left,r.bottom-rect.top]})
             self.handles[nid]=c
             if depth<40:
                 for child in c.children():q.append((child,nid,depth+1))
