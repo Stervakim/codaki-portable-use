@@ -60,10 +60,11 @@ class Agent:
         if len(raw.encode())>4*1024*1024-8192:raw=json.dumps({'error':'Result exceeded transport limit; original outcome is stored in the local journal. Do not replay.','code':'RESULT_TOO_LARGE'})
         self.db.execute('INSERT OR IGNORE INTO outbox VALUES (?,?)',(ident,raw));self.db.commit()
         return self.flush()
-    def run(self,stop_event):
+    def run(self,stop_event,local_rpc=None):
         failures=0
         while not stop_event.is_set():
             try:
+                if local_rpc:local_rpc.pump()
                 self.engine.expire()
                 if not self.flush():raise OSError('Pending result not acknowledged')
                 r=self.relay.request('/agent/next',{'capabilities':self.engine._run('capabilities',{})})
@@ -71,4 +72,8 @@ class Agent:
                 else:stop_event.wait(0.05)  # Match proven Android Use relay responsiveness
                 failures=0
             except (OSError,ValueError,UseError):
-                failures+=1;stop_event.wait(min(30,2**min(failures,4))+random.random())
+                failures+=1
+                until=time.monotonic()+min(30,2**min(failures,4))+random.random()
+                while not stop_event.is_set() and time.monotonic()<until:
+                    if local_rpc:local_rpc.pump()
+                    stop_event.wait(.05)

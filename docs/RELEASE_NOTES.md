@@ -1,3 +1,5 @@
+Windows0.1.3: batch1–12 steps, stopped/uncertain receipts, crash checkpoints and optional owner-local Mini RPC. Shared desktop/input serialization retained.
+
 Codaki Portable Use 0.1.2b — обновлённая сборка 0.1.2.
 
 Windows: после любого GUI-ввода или запуска приложения наблюдения других открытых сеансов инвалидируются. При попытке использовать старое observation возвращается STALE, а не выполняется потенциально неверный ввод. Проверено на двух реальных окнах, регрессионные тесты пройдены. Android: исправлен номер версии в capabilities — он соответствует версии из установленного пакета.

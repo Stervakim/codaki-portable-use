@@ -5,10 +5,20 @@ from .engine import UseError
 
 TOOLS=json.loads((Path(__file__).resolve().parents[1]/'shared/tools.json').read_text(encoding='utf-8'))
 def content(value,is_error=False):
-    value=copy.deepcopy(value);image=value.pop('screenshot',None) if isinstance(value,dict) else None
+    value=copy.deepcopy(value);images=[]
+    def extract(item):
+        if isinstance(item,dict):
+            image=item.pop('screenshot',None)
+            if image:
+                if isinstance(image,dict) and image.get('mime_type') in ('image/png','image/jpeg') and isinstance(image.get('base64'),str):
+                    images.append({'type':'image','data':image['base64'],'mimeType':image['mime_type']})
+                else:item['screenshot_warning']='Invalid screenshot omitted; original receipt preserved'
+            for child in item.values():extract(child)
+        elif isinstance(item,list):
+            for child in item:extract(child)
+    extract(value)
     blocks=[{'type':'text','text':json.dumps(value,ensure_ascii=False,separators=(',',':'))}]
-    if image:blocks.append({'type':'image','data':image['base64'],'mimeType':image['mime_type']})
-    return {'content':blocks,'isError':is_error}
+    return {'content':blocks+images[-1:],'isError':is_error or isinstance(value,dict) and value.get('status')=='stopped'}
 
 def validate(schema,value):
     t=schema.get('type')

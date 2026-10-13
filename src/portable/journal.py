@@ -10,7 +10,9 @@ class Journal:
         self.db=sqlite3.connect(path,check_same_thread=False)
         if os.name!='nt':os.chmod(path,0o600)
         self.db.execute('CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, op TEXT NOT NULL, status TEXT NOT NULL, result TEXT, created REAL NOT NULL)')
-        self.db.execute("UPDATE requests SET status='uncertain',result=? WHERE status='started'",(canonical({'error':'Interrupted operation','code':'UNCERTAIN'}),))
+        # Keep batch checkpoints: completed steps and inflight identity are
+        # needed to reconcile a crash without repeating already applied input.
+        self.db.execute("UPDATE requests SET status='uncertain',result=json_set(COALESCE(result,'{}'),'$.status','uncertain','$.error','Interrupted operation','$.code','UNCERTAIN') WHERE status='started'")
         self.db.commit()
         self.compact()
     def get(self,rid):

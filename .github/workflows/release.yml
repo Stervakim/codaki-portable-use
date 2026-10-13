@@ -23,7 +23,7 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_*.py'
           node --test cloud/tests/sites.test.mjs
-      - name: Build 0.1.2b packages from tested source
+      - name: Build versioned packages from tested source
         run: |
           VERSION="$(cat VERSION)"
           python scripts/build_module.py --output "dist/codaki-portable-use-$VERSION-android.zip"

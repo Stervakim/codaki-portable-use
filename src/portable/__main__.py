@@ -4,7 +4,8 @@ from .engine import Engine
 from .mcp import handle
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('mode',choices=['stdio','agent','local','check']);p.add_argument('--platform',choices=['android','windows'],default='android');p.add_argument('--windows-backend',choices=['native','sky'],default='native');p.add_argument('--config',type=Path);p.add_argument('--state',type=Path,default=Path('state'));p.add_argument('--device-id',default='local');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('mode',choices=['stdio','agent','local','check']);p.add_argument('--platform',choices=['android','windows'],default='android');p.add_argument('--windows-backend',choices=['native','sky'],default='native');p.add_argument('--config',type=Path);p.add_argument('--state',type=Path,default=Path('state'));p.add_argument('--device-id',default='local');p.add_argument('--local-ipc-windows',action='store_true');a=p.parse_args()
+    if a.local_ipc_windows and (a.platform!='windows' or a.mode!='agent'):p.error('Windows local IPC requires the existing Windows agent mode')
     if a.platform=='android':from .android import AndroidBackend as Backend
     elif a.windows_backend=='sky':from .sky import SkyBackend as Backend
     else:from .windows_native import WindowsBackend as Backend
@@ -20,7 +21,7 @@ def main():
         from .windows_sessions import WindowsSessions
         engine=WindowsSessions(Backend,a.state/'journal.sqlite3')
     else:engine=Engine(Backend(),a.state/'journal.sqlite3')
-    backend=engine.backend;stop=threading.Event()
+    backend=engine.backend;stop=threading.Event();local_rpc=None;boundary=None
     for sig in (signal.SIGINT,signal.SIGTERM):signal.signal(sig,lambda *_:stop.set())
     try:
         if a.mode=='check':print(json.dumps(engine._run('capabilities',{}),ensure_ascii=False));return
@@ -33,8 +34,15 @@ def main():
             if not a.config:p.error('--config required for agent mode')
             cfg=json.loads(a.config.read_text(encoding='utf-8'));cfg['device_id']=cfg.get('device_id',a.device_id)
             relay=Relay(cfg);agent=Agent(engine,relay,a.state/'outbox.sqlite3')
-            try:agent.run(stop)
-            finally:agent.close();relay.close()
+            try:
+                if a.local_ipc_windows:
+                    from .windows_ipc import Boundary,LocalRPC
+                    boundary=Boundary(engine,a.state/'mini-bridge.sqlite3');local_rpc=LocalRPC(boundary).start()
+                agent.run(stop,local_rpc=local_rpc)
+            finally:
+                if local_rpc:local_rpc.close()
+                if boundary:boundary.close()
+                agent.close();relay.close()
         else:
             def reap():
                 while not stop.wait(1):
